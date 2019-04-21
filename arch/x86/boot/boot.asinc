@@ -1,0 +1,103 @@
+; Basic GRUB Multiboot header (comments helpfully provided by OSdev.org)
+; Constants for multiboot header
+MBALIGN equ 1<<0 ; align loaded modules on page boundaries
+MEMINFO equ 1<<1 ; provide memory map
+FLAGS equ MBALIGN | MEMINFO ; this is the multiboot flag field
+MAGIC equ 0x1BADB002 ; magic number lets bootloader find header
+CHECKSUM equ -(MAGIC + FLAGS) ; checksum of everything above, to prove that this is multiboot compatible
+
+
+KERNEL_VIRTUAL_BASE equ 0xC0000000
+
+%define PHYS_ADDR(x) x-KERNEL_VIRTUAL_BASE
+extern __kernel_start
+extern __kernel_end
+
+section .multiboot
+align 4
+	dd MAGIC
+	dd FLAGS
+	dd CHECKSUM
+section .kstack nobits
+align 16
+stack_bottom:
+	resb 16384 ; 16 KiB
+stack_top:
+section .bss
+align 4096
+boot_page_directory:
+	resb 4096
+boot_page_table1:
+	resb 4096
+
+	
+section .text
+global start
+start:
+	; clear DF because we don't know what state it's in
+	cld
+	cli ; disable interrupts
+	
+	mov edi, PHYS_ADDR(boot_page_table1)
+	mov esi,0
+	mov ecx, 1023
+	
+	.start_mapping:
+	cmp esi, PHYS_ADDR(__kernel_start)
+	jl short .inc_addr
+	cmp esi, PHYS_ADDR(__kernel_end)
+	jge short .map_page
+	
+	mov edx, esi
+	or edx, 0x0003
+	mov [edi], edx
+	
+	.inc_addr:
+	add esi, 4096
+	add edi, 4
+	loop .start_mapping
+	.map_page:
+	
+	mov dword [PHYS_ADDR(boot_page_table1) + 1023 * 4], (0xB8000 | 0x3)
+	
+	mov dword [PHYS_ADDR(boot_page_directory)], (PHYS_ADDR(boot_page_table1) + 0x0003)
+	mov dword [PHYS_ADDR(boot_page_directory) + 768 * 4], (PHYS_ADDR(boot_page_table1) + 0x0003)
+	
+	mov ecx, PHYS_ADDR(boot_page_directory)
+	mov cr3, ecx
+	
+	mov ecx, cr0
+	or ecx, 0x80010000
+	mov cr0, ecx
+	
+	lea ecx, [.higherhalf_jump]
+	jmp ecx
+	
+	.higherhalf_jump:
+	xchg word bx, bx
+	mov dword [boot_page_directory], 0
+	invlpg [0] ; unpage the lowest mb because we're done with it (for now)
+	
+	mov esp, stack_top
+	
+	push eax
+	
+	add ebx, KERNEL_VIRTUAL_BASE ; GRUB gives us a physical pointer, we want a virtual one
+	push ebx ; load multiboot info
+	
+	extern preboot_init_x86
+	call preboot_init_x86
+	
+	
+	extern _init
+	call _init ; call our global constructors
+
+
+	extern kmain
+	call kmain
+	
+
+		cli
+.hang:  hlt
+		jmp .hang
+.end:

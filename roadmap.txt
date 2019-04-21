@@ -1,0 +1,11 @@
+TOP PRIORITY:
+- Implement proper paging in C 
+- Implement a memory manager
+MEDIUM PRIORITY:
+- Add user mode support
+- Expand standard library
+LOW PRIORITY:
+- Add ACPI support
+- Use APIC instead of the old PIC
+- Port to 64 bit x86
+
