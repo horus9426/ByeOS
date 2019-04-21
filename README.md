@@ -12,8 +12,10 @@ A simple UNIX-like hobby OS currently written for 32-bit x86.
 ### FAQ
 What is the goal of this project?
 * The goal of this project is to educate me on how operating systems work, as well as to provide me with something to do in my spare time
+
 Can I contribute?
 * Sure! If you see any code that could use improvements, feel free to submit a pull request
+
 What are you planning on adding?
 * See roadmap.txt to see what I have currently prioritized
 ## USAGE
